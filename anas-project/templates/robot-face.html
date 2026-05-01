@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robo</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #0f0a1e;
+    overflow: hidden;
+    user-select: none;
+    cursor: pointer;
+    transition: background 0.5s;
+  }
+  body.state-listen { background: #041910; }
+  body.state-think  { background: #1a1200; }
+  body.state-speak  { background: #1a0613; }
+
+  .scene {
+    width: 100vw; height: 100vh;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .scene::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 65% 55% at 50% 52%, rgba(167,139,250,0.1) 0%, transparent 70%);
+    pointer-events: none; transition: background 0.6s;
+  }
+  body.state-listen .scene::before { background: radial-gradient(ellipse 65% 55% at 50% 52%, rgba(52,211,153,0.12) 0%, transparent 70%); }
+  body.state-think  .scene::before { background: radial-gradient(ellipse 65% 55% at 50% 52%, rgba(251,191,36,0.11) 0%, transparent 70%); }
+  body.state-speak  .scene::before { background: radial-gradient(ellipse 65% 55% at 50% 52%, rgba(244,114,182,0.13) 0%, transparent 70%); }
+
+  .face-svg {
+    width: min(88vw, 88vh);
+    height: min(88vw, 88vh);
+    overflow: visible;
+  }
+
+  /* eye groups — ALL hidden; only active state shows one */
+  .eyes-idle, .eyes-listen, .eyes-think, .eyes-speak { display: none !important; }
+  body.state-idle   .eyes-idle   { display: block !important; }
+  body.state-listen .eyes-listen { display: block !important; }
+  body.state-think  .eyes-think  { display: block !important; }
+  body.state-speak  .eyes-speak  { display: block !important; }
+
+  body.state-think .cheek { display: none; }
+
+  body.state-listen .face-svg { animation: bob 0.7s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+  body.state-speak .face-svg { animation: wiggle 0.22s ease-in-out infinite alternate; }
+  @keyframes wiggle { from{transform:rotate(-2deg)} to{transform:rotate(2deg)} }
+</style>
+</head>
+<body class="state-idle">
+<div class="scene" onclick="toggleListen()">
+<svg class="face-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow-v" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-g" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-y" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-p" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- clip so pupils can't wander outside eye bounds -->
+    <clipPath id="clip-eye-l-idle">
+      <polygon points="0,-55 13,-13 55,0 13,13 0,55 -13,13 -55,0 -13,-13"/>
+    </clipPath>
+    <clipPath id="clip-eye-r-idle">
+      <polygon points="0,-55 13,-13 55,0 13,13 0,55 -13,13 -55,0 -13,-13"/>
+    </clipPath>
+    <clipPath id="clip-eye-l-sq">
+      <rect x="-46" y="-60" width="92" height="120" rx="10"/>
+    </clipPath>
+    <clipPath id="clip-eye-r-sq">
+      <rect x="-46" y="-60" width="92" height="120" rx="10"/>
+    </clipPath>
+  </defs>
+
+  <!-- ══════════════════════════
+       IDLE — 4-point star eyes
+       ══════════════════════════ -->
+  <g class="eyes-idle" filter="url(#glow-v)">
+
+    <!-- left star -->
+    <g id="idle-eye-l" transform="translate(120,170)">
+      <!-- outer star shell (static) -->
+      <polygon points="0,-55 13,-13 55,0 13,13 0,55 -13,13 -55,0 -13,-13" fill="#a78bfa"/>
+      <!-- gaze group — this translates with face position -->
+      <g id="idle-gaze-l">
+        <polygon points="0,-26 6,-6 26,0 6,6 0,26 -6,6 -26,0 -6,-6" fill="white" opacity="0.85"/>
+        <polygon points="0,-11 3,-3 11,0 3,3 0,11 -3,3 -11,0 -3,-3" fill="white"/>
+      </g>
+      <!-- slow rotation on shell only -->
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="7s" repeatCount="indefinite" additive="sum"/>
+    </g>
+
+    <!-- right star -->
+    <g id="idle-eye-r" transform="translate(280,170)">
+      <polygon points="0,-55 13,-13 55,0 13,13 0,55 -13,13 -55,0 -13,-13" fill="#a78bfa"/>
+      <g id="idle-gaze-r">
+        <polygon points="0,-26 6,-6 26,0 6,6 0,26 -6,6 -26,0 -6,-6" fill="white" opacity="0.85"/>
+        <polygon points="0,-11 3,-3 11,0 3,3 0,11 -3,3 -11,0 -3,-3" fill="white"/>
+      </g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="7s" repeatCount="indefinite" additive="sum"/>
+    </g>
+
+    <!-- smile -->
+    <polyline points="138,288 160,308 200,318 240,308 262,288"
+              fill="none" stroke="#a78bfa" stroke-width="7"
+              stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- ═══════════════════════════
+       LISTEN — tall square eyes
+       ═══════════════════════════ -->
+  <g class="eyes-listen" filter="url(#glow-g)">
+
+    <!-- left -->
+    <g transform="translate(120,168)">
+      <rect x="-46" y="-60" width="92" height="120" rx="10" fill="#041a10" stroke="#34d399" stroke-width="5"/>
+      <!-- gaze: square pupil moves inside box -->
+      <g id="listen-gaze-l" clip-path="url(#clip-eye-l-sq)">
+        <rect x="-20" y="-26" width="40" height="52" rx="5" fill="#34d399"/>
+        <rect x="-34" y="-48" width="18" height="18" rx="4" fill="white" opacity="0.75"/>
+      </g>
+      <!-- scan line (stays fixed) -->
+      <rect x="-42" y="-2" width="84" height="6" rx="3" fill="#34d399" opacity="0.4">
+        <animate attributeName="y" from="-50" to="50" dur="0.85s" repeatCount="indefinite"/>
+      </rect>
+      <line x1="-24" y1="-60" x2="-24" y2="-76" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+      <line x1="0"   y1="-60" x2="0"   y2="-80" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+      <line x1="24"  y1="-60" x2="24"  y2="-76" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <!-- right -->
+    <g transform="translate(280,168)">
+      <rect x="-46" y="-60" width="92" height="120" rx="10" fill="#041a10" stroke="#34d399" stroke-width="5"/>
+      <g id="listen-gaze-r" clip-path="url(#clip-eye-r-sq)">
+        <rect x="-20" y="-26" width="40" height="52" rx="5" fill="#34d399"/>
+        <rect x="-34" y="-48" width="18" height="18" rx="4" fill="white" opacity="0.75"/>
+      </g>
+      <rect x="-42" y="-2" width="84" height="6" rx="3" fill="#34d399" opacity="0.4">
+        <animate attributeName="y" from="-50" to="50" dur="0.85s" repeatCount="indefinite"/>
+      </rect>
+      <line x1="-24" y1="-60" x2="-24" y2="-76" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+      <line x1="0"   y1="-60" x2="0"   y2="-80" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+      <line x1="24"  y1="-60" x2="24"  y2="-76" stroke="#34d399" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <rect x="170" y="280" width="60" height="46" rx="12" fill="none" stroke="#34d399" stroke-width="6"/>
+  </g>
+
+  <!-- ═══════════════════════════════════
+       THINK — flat diamond squint + swirl
+       ═══════════════════════════════════ -->
+  <g class="eyes-think" filter="url(#glow-y)">
+    <!-- think eyes are squints — gaze movement would be subtle; keep them mostly static -->
+    <g transform="translate(120,170)">
+      <polygon points="0,-30 56,0 0,30 -56,0" fill="#1c1700" stroke="#fbbf24" stroke-width="5"/>
+      <g id="think-gaze-l">
+        <polygon points="0,-16 16,0 0,16 -16,0" fill="#fbbf24"/>
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1.6s" repeatCount="indefinite"/>
+      </g>
+      <path d="M0,0 Q8,-20 20,-10 Q28,4 12,16 Q-6,22 -18,8 Q-22,-12 -4,-22 Q16,-30 28,-14"
+            fill="none" stroke="white" stroke-width="2" opacity="0.4">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="2.2s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <g transform="translate(280,170)">
+      <polygon points="0,-30 56,0 0,30 -56,0" fill="#1c1700" stroke="#fbbf24" stroke-width="5"/>
+      <g id="think-gaze-r">
+        <polygon points="0,-16 16,0 0,16 -16,0" fill="#fbbf24"/>
+        <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="1.6s" repeatCount="indefinite"/>
+      </g>
+      <path d="M0,0 Q8,-20 20,-10 Q28,4 12,16 Q-6,22 -18,8 Q-22,-12 -4,-22 Q16,-30 28,-14"
+            fill="none" stroke="white" stroke-width="2" opacity="0.4">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="2.2s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <line x1="152" y1="302" x2="248" y2="302" stroke="#fbbf24" stroke-width="7" stroke-linecap="round"/>
+    <g>
+      <rect x="177" y="324" width="14" height="14" rx="3" fill="#fbbf24">
+        <animate attributeName="y" values="324;313;324" dur="0.65s" begin="0s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;1;0.25" dur="0.65s" begin="0s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="196" y="324" width="14" height="14" rx="3" fill="#fbbf24">
+        <animate attributeName="y" values="324;313;324" dur="0.65s" begin="0.18s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;1;0.25" dur="0.65s" begin="0.18s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="215" y="324" width="14" height="14" rx="3" fill="#fbbf24">
+        <animate attributeName="y" values="324;313;324" dur="0.65s" begin="0.36s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;1;0.25" dur="0.65s" begin="0.36s" repeatCount="indefinite"/>
+      </rect>
+    </g>
+  </g>
+
+  <!-- ══════════════════
+       SPEAK — heart eyes
+       ══════════════════ -->
+  <g class="eyes-speak" filter="url(#glow-p)">
+    <!-- hearts move as a whole to follow gaze -->
+    <g id="speak-gaze-l" transform="translate(120,175)">
+      <path d="M0,40 C-54,10 -56,-36 -24,-42 C-10,-45 0,-30 0,-30 C0,-30 10,-45 24,-42 C56,-36 54,10 0,40 Z" fill="#f472b6">
+        <animateTransform attributeName="transform" type="scale" values="1;1.1;1" dur="0.5s" repeatCount="indefinite"/>
+      </path>
+      <polygon points="0,-28 6,-18 0,-8 -6,-18" fill="white" opacity="0.8"/>
+    </g>
+    <g id="speak-gaze-r" transform="translate(280,175)">
+      <path d="M0,40 C-54,10 -56,-36 -24,-42 C-10,-45 0,-30 0,-30 C0,-30 10,-45 24,-42 C56,-36 54,10 0,40 Z" fill="#f472b6">
+        <animateTransform attributeName="transform" type="scale" values="1;1.1;1" dur="0.5s" repeatCount="indefinite" begin="0.12s"/>
+      </path>
+      <polygon points="0,-28 6,-18 0,-8 -6,-18" fill="white" opacity="0.8"/>
+    </g>
+    <!-- speak bars -->
+    <g transform="translate(200,302)">
+      <rect x="-62" y="0" width="16" height="6" rx="4" fill="#f472b6">
+        <animate attributeName="height" values="6;46;6" dur="0.28s" repeatCount="indefinite" begin="0s"/>
+        <animate attributeName="y" values="0;-40;0" dur="0.28s" repeatCount="indefinite" begin="0s"/>
+      </rect>
+      <rect x="-36" y="0" width="16" height="6" rx="4" fill="#f472b6">
+        <animate attributeName="height" values="6;58;6" dur="0.28s" repeatCount="indefinite" begin="0.07s"/>
+        <animate attributeName="y" values="0;-52;0" dur="0.28s" repeatCount="indefinite" begin="0.07s"/>
+      </rect>
+      <rect x="-10" y="0" width="16" height="6" rx="4" fill="#f472b6">
+        <animate attributeName="height" values="6;40;6" dur="0.28s" repeatCount="indefinite" begin="0.14s"/>
+        <animate attributeName="y" values="0;-34;0" dur="0.28s" repeatCount="indefinite" begin="0.14s"/>
+      </rect>
+      <rect x="16" y="0" width="16" height="6" rx="4" fill="#f472b6">
+        <animate attributeName="height" values="6;54;6" dur="0.28s" repeatCount="indefinite" begin="0.07s"/>
+        <animate attributeName="y" values="0;-48;0" dur="0.28s" repeatCount="indefinite" begin="0.07s"/>
+      </rect>
+      <rect x="42" y="0" width="16" height="6" rx="4" fill="#f472b6">
+        <animate attributeName="height" values="6;38;6" dur="0.28s" repeatCount="indefinite" begin="0s"/>
+        <animate attributeName="y" values="0;-32;0" dur="0.28s" repeatCount="indefinite" begin="0s"/>
+      </rect>
+    </g>
+  </g>
+
+  <!-- blush cheeks -->
+  <ellipse class="cheek" cx="60"  cy="248" rx="38" ry="18" fill="rgba(244,114,182,0.2)"/>
+  <ellipse class="cheek" cx="340" cy="248" rx="38" ry="18" fill="rgba(244,114,182,0.2)"/>
+
+</svg>
+</div>
+
+<script>
+  // ── initial state ──────────────────────────────
+  document.body.className = "state-idle";
+
+  // ── socket ─────────────────────────────────────
+  const socket = io();
+  socket.on("state", d => setState(d.state));
+  socket.on("gaze",  d => applyGaze(d.x, d.y));
+
+  let current = "idle";
+
+  function setState(s) {
+    current = s;
+    document.body.className = "state-" + s;
+  }
+
+  // ── gaze tracking ──────────────────────────────
+  // How far (in SVG units) pupils can travel from eye centre
+  const GAZE_RANGE_IDLE   = 18;   // star inner shine — small range
+  const GAZE_RANGE_LISTEN = 22;   // square pupil inside box
+  const GAZE_RANGE_THINK  = 10;   // squint — barely moves
+  const GAZE_RANGE_SPEAK  = 26;   // heart — bounces around more
+
+  // Smooth the incoming gaze so it feels natural, not jittery
+  let smoothX = 0, smoothY = 0;
+  const LERP = 0.18;  // fraction moved per frame toward target
+
+  function applyGaze(targetX, targetY) {
+    // lerp toward target
+    smoothX += (targetX - smoothX) * LERP;
+    smoothY += (targetY - smoothY) * LERP;
+
+    const sx = smoothX, sy = smoothY;
+
+    // idle: move the inner shine polygons
+    moveGroup("idle-gaze-l",  sx * GAZE_RANGE_IDLE,  sy * GAZE_RANGE_IDLE);
+    moveGroup("idle-gaze-r",  sx * GAZE_RANGE_IDLE,  sy * GAZE_RANGE_IDLE);
+
+    // listen: move square pupils
+    moveGroup("listen-gaze-l", sx * GAZE_RANGE_LISTEN, sy * GAZE_RANGE_LISTEN);
+    moveGroup("listen-gaze-r", sx * GAZE_RANGE_LISTEN, sy * GAZE_RANGE_LISTEN);
+
+    // think: slight nudge on the spinning diamond
+    moveGroup("think-gaze-l",  sx * GAZE_RANGE_THINK,  sy * GAZE_RANGE_THINK);
+    moveGroup("think-gaze-r",  sx * GAZE_RANGE_THINK,  sy * GAZE_RANGE_THINK);
+
+    // speak: shift the whole heart
+    setTranslate("speak-gaze-l", 120 + sx * GAZE_RANGE_SPEAK, 175 + sy * GAZE_RANGE_SPEAK);
+    setTranslate("speak-gaze-r", 280 + sx * GAZE_RANGE_SPEAK, 175 + sy * GAZE_RANGE_SPEAK);
+  }
+
+  function moveGroup(id, dx, dy) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("transform", `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})`);
+  }
+
+  function setTranslate(id, x, y) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("transform", `translate(${x.toFixed(2)}, ${y.toFixed(2)})`);
+  }
+
+  // ── toggle listen ──────────────────────────────
+  let lastToggle = 0;
+  function toggleListen() {
+    const now = Date.now();
+    if (now - lastToggle < 500) return;
+    lastToggle = now;
+    if (current === "think" || current === "speak") return;
+    fetch("/activate", { method: "POST" });
+  }
+
+  document.querySelector(".scene").addEventListener("click", toggleListen);
+
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" || e.code === "Enter") {
+      e.preventDefault();
+      toggleListen();
+    }
+  });
+</script>
+</body>
+</html>
