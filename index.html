@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROBO Assistant</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<div class="robot happy" id="robot">
+  <div class="eye left"  id="eyeL"><div class="pupil" id="pupilL"></div></div>
+  <div class="eye right" id="eyeR"><div class="pupil" id="pupilR"></div></div>
+  <div class="mouth" id="mouth"></div>
+</div>
+
+<div class="panel">
+  <div class="model-row">
+    <label>Model:</label>
+    <h3 id="modelSelect">
+      <option value="tinyllama">tinyllama</option>
+    </h3>
+  </div>
+
+  <div id="ollamaStatus" class="ollama-status checking">⏳ Checking Ollama...</div>
+
+  <button id="listenBtn" onclick="toggleListening()" disabled>🎤 Start Assistant</button>
+
+  <p id="status">Checking connection...</p>
+  <p id="transcript"></p>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
