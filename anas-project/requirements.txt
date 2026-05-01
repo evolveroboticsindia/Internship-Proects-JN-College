@@ -1,0 +1,20 @@
+# Robo — Python dependencies
+# Install with:  pip install -r requirements.txt --break-system-packages
+
+# Web server
+flask>=3.0.0
+flask-socketio>=5.3.6
+
+# Speech-to-text (Whisper)
+faster-whisper>=1.0.0
+
+# Audio recording & playback
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+
+# LLM (talks to Ollama over HTTP — no extra package needed beyond requests)
+requests>=2.31.0
+
+# Face tracking
+opencv-python>=4.9.0
